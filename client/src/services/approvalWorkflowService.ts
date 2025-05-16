@@ -3,11 +3,16 @@ import api from "./api";
 export interface ApprovalWorkflow {
   id: string;
   name: string;
+  description?: string;
   minDays: number;
   maxDays: number;
   approvalLevels: {
     level: number;
     roles: string[];
+    approverType?: string;
+    fallbackRoles?: string[];
+    departmentSpecific?: boolean;
+    required?: boolean;
   }[];
   isActive: boolean;
   createdAt: string;
@@ -37,8 +42,15 @@ export const updateApprovalWorkflow = async (
     Omit<ApprovalWorkflow, "id" | "createdAt" | "updatedAt">
   >
 ) => {
-  const response = await api.put(`/approval-workflows/${id}`, workflowData);
-  return response.data;
+  console.log(`Updating workflow ${id} with data:`, workflowData);
+  try {
+    const response = await api.put(`/approval-workflows/${id}`, workflowData);
+    console.log('Update response:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error updating workflow:', error);
+    throw error;
+  }
 };
 
 export const deleteApprovalWorkflow = async (id: string) => {

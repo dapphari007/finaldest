@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import {
   getAllApprovalWorkflows,
   deleteApprovalWorkflow,
+  updateApprovalWorkflow,
   ApprovalWorkflow,
   initializeDefaultWorkflows,
 } from "../../services/approvalWorkflowService";
@@ -13,6 +14,7 @@ import Alert from "../../components/ui/Alert";
 export default function ApprovalWorkflowsPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [workflowToDelete, setWorkflowToDelete] = useState<string | null>(null);
+  const [workflowToToggle, setWorkflowToToggle] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
@@ -43,14 +45,20 @@ export default function ApprovalWorkflowsPage() {
   });
   
   const toggleStatusMutation = useMutation({
-    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) => 
-      updateApprovalWorkflow(id, { isActive }),
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) => {
+      // Only send the isActive field to avoid validation issues with other fields
+      setWorkflowToToggle(id);
+      return updateApprovalWorkflow(id, { isActive });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["approvalWorkflows"] });
       setSuccessMessage("Workflow status updated successfully");
+      setWorkflowToToggle(null);
     },
     onError: (error: any) => {
+      console.error("Error toggling workflow status:", error);
       setErrorMessage(error.response?.data?.message || "Failed to update workflow status");
+      setWorkflowToToggle(null);
     }
   });
   
@@ -77,6 +85,7 @@ export default function ApprovalWorkflowsPage() {
   };
   
   const handleToggleStatus = (id: string, isActive: boolean) => {
+    console.log(`Toggling workflow ${id} to ${isActive ? 'active' : 'inactive'}`);
     toggleStatusMutation.mutate({ id, isActive });
   };
   
@@ -211,8 +220,11 @@ export default function ApprovalWorkflowsPage() {
                           ? 'text-orange-600 hover:text-orange-800' 
                           : 'text-green-600 hover:text-green-800'
                       }`}
+                      disabled={toggleStatusMutation.isPending && workflowToToggle === workflow.id}
                     >
-                      {workflow.isActive ? 'Deactivate' : 'Activate'}
+                      {(toggleStatusMutation.isPending && workflowToToggle === workflow.id)
+                        ? 'Updating...' 
+                        : (workflow.isActive ? 'Deactivate' : 'Activate')}
                     </button>
                     <button
                       onClick={() => handleDeleteClick(workflow.id)}

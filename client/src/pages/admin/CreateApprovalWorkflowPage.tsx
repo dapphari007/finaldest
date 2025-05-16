@@ -65,19 +65,56 @@ export default function CreateApprovalWorkflowPage() {
   });
 
   const onSubmit = (data: FormValues) => {
+    console.log("Form data submitted:", data);
+    
     // Ensure steps are properly ordered
     const formattedSteps = data.steps.map((step, index) => ({
       ...step,
       order: index + 1,
     }));
 
+    console.log("Formatted steps:", formattedSteps);
+
     // Convert steps to approvalLevels format expected by the server
     const approvalLevels = formattedSteps.map((step, index) => {
-      return {
+      // Determine the role value based on approverType
+      let roleValue: string;
+      let backendApproverType: string;
+      
+      if (step.approverType === "specific_user" && step.approverId) {
+        roleValue = step.approverId;
+        backendApproverType = "specificUser";
+      } else if (step.approverType === "team_lead") {
+        roleValue = "TEAM_LEAD";
+        backendApproverType = "teamLead";
+      } else if (step.approverType === "manager") {
+        roleValue = "MANAGER";
+        backendApproverType = "manager";
+      } else if (step.approverType === "hr") {
+        roleValue = "HR";
+        backendApproverType = "hr";
+      } else if (step.approverType === "department_head") {
+        roleValue = "MANAGER"; // Department head is typically a manager role
+        backendApproverType = "departmentHead";
+      } else {
+        roleValue = step.approverType.toUpperCase();
+        backendApproverType = step.approverType;
+      }
+      
+      const approvalLevel = {
         level: index + 1,
-        roles: [step.approverType === "specific_user" ? step.approverId : step.approverType]
+        roles: [roleValue],
+        departmentSpecific: step.approverType !== "specific_user", // Set department-specific for role-based approvers
+        approverType: backendApproverType,
+        fallbackRoles: [roleValue], // Add fallback roles matching the primary role
+        required: step.required
       };
+      
+      console.log("Created approval level:", approvalLevel);
+      return approvalLevel;
     });
+
+    console.log("Final approval levels:", approvalLevels);
 
     createMutation.mutate({
       name: data.name,

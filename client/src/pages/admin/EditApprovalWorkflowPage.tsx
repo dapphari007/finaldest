@@ -60,13 +60,77 @@ export default function EditApprovalWorkflowPage() {
 
   useEffect(() => {
     if (workflow) {
+      console.log("Original workflow data:", workflow);
+      
+      // Convert approvalLevels from backend to steps format for the form
+      const steps = workflow.approvalLevels?.map((level) => {
+        console.log("Processing approval level:", level);
+        
+        // Determine approver type and approverId based on roles
+        let approverType: "team_lead" | "manager" | "hr" | "department_head" | "specific_user" = "team_lead";
+        let approverId: string | undefined = undefined;
+        
+        // First check if there's an approverType field directly in the level
+        if (level.approverType) {
+          console.log("Found approverType in level:", level.approverType);
+          
+          // Map backend approverType to frontend approverType
+          if (level.approverType === "teamLead") {
+            approverType = "team_lead";
+          } else if (level.approverType === "manager") {
+            approverType = "manager";
+          } else if (level.approverType === "hr") {
+            approverType = "hr";
+          } else if (level.approverType === "departmentHead") {
+            approverType = "department_head";
+          } else if (level.approverType === "specificUser") {
+            approverType = "specific_user";
+            // In this case, the first role should be the user ID
+            if (Array.isArray(level.roles) && level.roles.length > 0) {
+              approverId = level.roles[0];
+            }
+          }
+        } else {
+          // Fallback to checking roles if no approverType is specified
+          const role = Array.isArray(level.roles) && level.roles.length > 0 ? level.roles[0] : "";
+          console.log("Role value:", role);
+          
+          if (role === "TEAM_LEAD" || role === "team_lead") {
+            approverType = "team_lead";
+          } else if (role === "MANAGER" || role === "manager") {
+            approverType = "manager";
+          } else if (role === "HR" || role === "hr") {
+            approverType = "hr";
+          } else if (role === "DEPARTMENT_HEAD" || role === "department_head") {
+            approverType = "department_head";
+          } else if (role && role !== "SUPER_ADMIN" && role !== "EMPLOYEE") {
+            // If it's not a standard role, assume it's a user ID
+            approverType = "specific_user";
+            approverId = role;
+          }
+        }
+        
+        const step = {
+          id: `step-${level.level}`,
+          order: level.level,
+          approverType,
+          approverId,
+          required: level.required !== undefined ? level.required : true, // Use level.required if available, otherwise default to true
+        };
+        
+        console.log("Created step:", step);
+        return step;
+      }) || [];
+      
+      console.log("Converted steps:", steps);
+      
       reset({
         name: workflow.name,
         description: workflow.description || "",
         minDays: workflow.minDays,
         maxDays: workflow.maxDays,
         isActive: workflow.isActive,
-        steps: workflow.steps || [],
+        steps: steps,
       });
     }
   }, [workflow, reset]);
@@ -92,19 +156,56 @@ export default function EditApprovalWorkflowPage() {
   });
 
   const onSubmit = (data: FormValues) => {
+    console.log("Form data submitted:", data);
+    
     // Ensure steps are properly ordered
     const formattedSteps = data.steps.map((step, index) => ({
       ...step,
       order: index + 1,
     }));
 
+    console.log("Formatted steps:", formattedSteps);
+
     // Convert steps to approvalLevels format expected by the server
     const approvalLevels = formattedSteps.map((step, index) => {
-      return {
+      // Determine the role value based on approverType
+      let roleValue: string;
+      let backendApproverType: string;
+      
+      if (step.approverType === "specific_user" && step.approverId) {
+        roleValue = step.approverId;
+        backendApproverType = "specificUser";
+      } else if (step.approverType === "team_lead") {
+        roleValue = "TEAM_LEAD";
+        backendApproverType = "teamLead";
+      } else if (step.approverType === "manager") {
+        roleValue = "MANAGER";
+        backendApproverType = "manager";
+      } else if (step.approverType === "hr") {
+        roleValue = "HR";
+        backendApproverType = "hr";
+      } else if (step.approverType === "department_head") {
+        roleValue = "MANAGER"; // Department head is typically a manager role
+        backendApproverType = "departmentHead";
+      } else {
+        roleValue = step.approverType.toUpperCase();
+        backendApproverType = step.approverType;
+      }
+      
+      const approvalLevel = {
         level: index + 1,
-        roles: [step.approverType === "specific_user" ? step.approverId : step.approverType]
+        roles: [roleValue],
+        departmentSpecific: step.approverType !== "specific_user", // Set department-specific for role-based approvers
+        approverType: backendApproverType,
+        fallbackRoles: [roleValue], // Add fallback roles matching the primary role
+        required: step.required
       };
+      
+      console.log("Created approval level:", approvalLevel);
+      return approvalLevel;
     });
+
+    console.log("Final approval levels:", approvalLevels);
 
     updateMutation.mutate({
       name: data.name,

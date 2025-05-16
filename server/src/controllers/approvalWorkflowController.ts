@@ -358,6 +358,11 @@ export const updateApprovalWorkflow = async (
         }
 
         for (const role of level.roles) {
+          // Skip validation for user IDs (which might not be in UserRole enum)
+          if (typeof role === 'string' && role.length > 10) {
+            continue; // Likely a UUID, skip validation
+          }
+          
           if (!Object.values(UserRole).includes(role)) {
             return h.response({ message: `Invalid role: ${role}` }).code(400);
           }
