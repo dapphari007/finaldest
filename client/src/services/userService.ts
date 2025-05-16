@@ -1,4 +1,4 @@
-import { get, post, put } from "./api";
+import { get, post, put, del } from "./api";
 import { ApiResponse, User } from "../types";
 
 export interface CreateUserData {
@@ -63,6 +63,10 @@ export const deactivateUser = async (
   id: string
 ): Promise<ApiResponse<User>> => {
   return put<ApiResponse<User>>(`/users/${id}/deactivate`);
+};
+
+export const deleteUser = async (id: string): Promise<ApiResponse<void>> => {
+  return del<ApiResponse<void>>(`/users/${id}`);
 };
 
 export const resetUserPassword = async (

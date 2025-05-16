@@ -5,6 +5,7 @@ import {
   getUsers,
   activateUser,
   deactivateUser,
+  deleteUser,
 } from "../../services/userService";
 import { getAllDepartments, Department } from "../../services/departmentService";
 import { getAllPositions, Position } from "../../services/positionService";
@@ -14,6 +15,7 @@ import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import Alert from "../../components/ui/Alert";
 import { getErrorMessage } from "../../utils/errorUtils";
+import Modal from "../../components/ui/Modal";
 
 const UsersPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
@@ -23,6 +25,8 @@ const UsersPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   // Fetch departments and positions
   useEffect(() => {
@@ -68,6 +72,33 @@ const UsersPage: React.FC = () => {
         await activateUser(id);
         setSuccessMessage("User activated successfully");
       }
+      refetch();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Open delete confirmation modal
+  const confirmDelete = (user: User) => {
+    setUserToDelete(user);
+    setShowDeleteModal(true);
+  };
+  
+  // Handle delete user
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return;
+    
+    setIsLoading(true);
+    setError(null);
+    setSuccessMessage(null);
+    
+    try {
+      await deleteUser(userToDelete.id);
+      setSuccessMessage("User deleted successfully");
+      setShowDeleteModal(false);
+      setUserToDelete(null);
       refetch();
     } catch (err) {
       setError(getErrorMessage(err));
@@ -234,7 +265,7 @@ const UsersPage: React.FC = () => {
                         </Button>
                       </Link>
                       <Button
-                        variant={user.isActive ? "danger" : "success"}
+                        variant={user.isActive ? "primary" : "success"}
                         size="sm"
                         onClick={() =>
                           handleToggleUserStatus(user.id, user.isActive)
@@ -242,6 +273,14 @@ const UsersPage: React.FC = () => {
                         disabled={isLoading}
                       >
                         {user.isActive ? "Deactivate" : "Activate"}
+                      </Button>
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={() => confirmDelete(user)}
+                        disabled={isLoading}
+                      >
+                        Delete
                       </Button>
                     </div>
                   </div>
@@ -255,6 +294,38 @@ const UsersPage: React.FC = () => {
           )}
         </ul>
       </div>
+      
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteModal && userToDelete !== null}
+        title="Confirm Delete"
+        onClose={() => setShowDeleteModal(false)}
+      >
+        {userToDelete && (
+          <div className="p-6">
+            <p className="mb-4">
+              Are you sure you want to delete the user <strong>{userToDelete.firstName} {userToDelete.lastName}</strong>?
+              This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <Button
+                variant="secondary"
+                onClick={() => setShowDeleteModal(false)}
+                disabled={isLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                onClick={handleDeleteUser}
+                disabled={isLoading}
+              >
+                {isLoading ? "Deleting..." : "Delete User"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };
